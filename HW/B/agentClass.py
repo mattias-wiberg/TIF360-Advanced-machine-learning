@@ -17,6 +17,11 @@ class TQAgent:
 
     def fn_init(self,gameboard):
         self.gameboard=gameboard
+        actions = [7, 6, 12, 3] # pillar, slash, L, square
+        self.qtables = [np.zeros((2**(self.gameboard.N_row*self.gameboard.N_col), action))
+         for action in actions]
+        a = 0
+        
         # TO BE COMPLETED BY STUDENT
         # This function should be written by you
         # Instructions:
@@ -28,6 +33,8 @@ class TQAgent:
         # 'gameboard.N_col' number of columns in gameboard
         # 'len(gameboard.tiles)' number of different tiles
         # 'self.episode_count' the total number of episodes in the training
+        
+
 
     def fn_load_strategy(self,strategy_file):
         pass

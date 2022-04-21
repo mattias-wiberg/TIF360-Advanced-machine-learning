@@ -30,7 +30,9 @@ class TGameBoard:
 
             #   x x
             #   x x
-            # Tile structure of tiles[i,j]: The first dimension denotes x value, the length denotes the number of columns taken by the tile. The second dimension consist of pairs giving the y range: first element in the pair is the first row of the tile and the second element second is the last row plus 1 of the tile for the current column
+            # Tile structure of tiles[i,j]:
+            # The first dimension denotes x value, the length denotes the number of columns taken by the tile.
+            # The second dimension consist of pairs giving the y range: first element in the pair is the first row of the tile and the second element second is the last row plus 1 of the tile for the current column
             self.tiles = [
                 [[[0,2]], [[0,1],[0,1]]],
                 [[[0,1],[1,2]], [[1,2],[0,1]]],
