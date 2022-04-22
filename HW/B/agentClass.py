@@ -1,7 +1,7 @@
+import pickle
+from distutils.log import error
 import numpy as np
 import random
-import math
-import h5py
 
 # This file provides the skeleton structure for the classes TQAgent and TDQNAgent to be completed by you, the student.
 # Locations starting with # TO BE COMPLETED BY STUDENT indicates missing code that should be written by you.
@@ -9,6 +9,8 @@ import h5py
 class TQAgent:
     # Agent for learning to play tetris using Q-learning
     def __init__(self,alpha,epsilon,episode_count):
+        np.random.seed(12345)
+        self.reward_tots = [0]*episode_count
         # Initialize training parameters
         self.alpha=alpha
         self.epsilon=epsilon
@@ -17,10 +19,9 @@ class TQAgent:
 
     def fn_init(self,gameboard):
         self.gameboard=gameboard
-        actions = [7, 6, 12, 3] # pillar, slash, L, square
+        self.actions = [7, 6, 12, 3] # pillar, slash, L, square
         self.qtables = [np.zeros((2**(self.gameboard.N_row*self.gameboard.N_col), action))
-         for action in actions]
-        a = 0
+         for action in self.actions]
         
         # TO BE COMPLETED BY STUDENT
         # This function should be written by you
@@ -37,12 +38,14 @@ class TQAgent:
 
 
     def fn_load_strategy(self,strategy_file):
-        pass
+        self.qtables = pickle.load(open(strategy_file, 'rb'))
         # TO BE COMPLETED BY STUDENT
         # Here you can load the Q-table (to Q-table of self) from the input parameter strategy_file (used to test how the agent plays)
 
     def fn_read_state(self):
-        pass
+        flatInt = (self.gameboard.board == 1).flatten().astype(int)
+        binary = "".join(map(str,flatInt))
+        self.state = int(binary, 2)
         # TO BE COMPLETED BY STUDENT
         # This function should be written by you
         # Instructions:
@@ -56,8 +59,44 @@ class TQAgent:
         # 'self.gameboard.board[index_row,index_col]' table indicating if row 'index_row' and column 'index_col' is occupied (+1) or free (-1)
         # 'self.gameboard.cur_tile_type' identifier of the current tile that should be placed on the game board (integer between 0 and len(self.gameboard.tiles))
 
+    def get_move(self, action_idx):
+        if self.actions[self.gameboard.cur_tile_type]-1 < action_idx:
+            error("Action index out of range!")
+        tile_type = self.gameboard.cur_tile_type
+        if tile_type == 0:
+            if action_idx < 4:
+                return {"x":action_idx, "orientation":0}
+            else:
+                return {"x":action_idx-4, "orientation":1}
+        elif tile_type == 1:
+            if action_idx < 3:
+                return {"x":action_idx, "orientation":0}
+            else:
+                return {"x":action_idx-3, "orientation":1}
+        elif tile_type == 2:
+            x_move = action_idx % 3
+            if action_idx < 3:
+                return {"x":x_move, "orientation":0}
+            elif action_idx < 6:
+                return {"x":x_move, "orientation":1}
+            elif action_idx < 9:
+                return {"x":x_move, "orientation":2}
+            else:
+                return {"x":x_move, "orientation":3}
+        elif tile_type == 3:
+            return {"x":action_idx, "orientation":0}
+
     def fn_select_action(self):
-        pass
+        if np.random.rand()<self.epsilon:
+            # Select random action
+            self.action_i=random.randint(0,self.actions[self.gameboard.cur_tile_type]-1)
+        else:
+            # Select action with highest Q-value
+            self.action_i=np.argmax(self.qtables[self.gameboard.cur_tile_type][self.state])
+
+        action = self.get_move(self.action_i)
+        if self.gameboard.fn_move(action["x"], action["orientation"]):
+            error("Movement failed!")
         # TO BE COMPLETED BY STUDENT
         # This function should be written by you
         # Instructions:
@@ -75,7 +114,14 @@ class TQAgent:
         # You can use this function to map out which actions are valid or not
     
     def fn_reinforce(self,old_state,reward):
-        pass
+        old_tile_type = old_state[1]
+        old_state = old_state[0]
+        average_future_reward = 0
+        for qtable in self.qtables:
+            average_future_reward += np.max(qtable[self.state])
+        average_future_reward/=len(self.qtables)
+        deltaQ = reward + average_future_reward - self.qtables[old_tile_type][old_state][self.action_i]
+        self.qtables[old_tile_type][old_state][self.action_i] += self.alpha*deltaQ
         # TO BE COMPLETED BY STUDENT
         # This function should be written by you
         # Instructions:
@@ -89,11 +135,12 @@ class TQAgent:
         if self.gameboard.gameover:
             self.episode+=1
             if self.episode%100==0:
-                print('episode '+str(self.episode)+'/'+str(self.episode_count)+' (reward: ',str(np.sum(self.reward_tots[range(self.episode-100,self.episode)])),')')
+                print('episode '+str(self.episode)+'/'+str(self.episode_count)+' (reward: ',str(np.mean(self.reward_tots[self.episode-100:self.episode])),')')
             if self.episode%1000==0:
                 saveEpisodes=[1000,2000,5000,10000,20000,50000,100000,200000,500000,1000000];
                 if self.episode in saveEpisodes:
-                    pass
+                    pickle.dump(self.qtables, open("Qtable_"+str(self.episode)+".p", "wb"))
+                    pickle.dump(self.reward_tots, open("Rewards_"+str(self.episode)+".p", "wb"))
                     # TO BE COMPLETED BY STUDENT
                     # Here you can save the rewards and the Q-table to data files for plotting of the rewards and the Q-table can be used to test how the agent plays
             if self.episode>=self.episode_count:
@@ -105,16 +152,16 @@ class TQAgent:
             self.fn_select_action()
             # TO BE COMPLETED BY STUDENT
             # Here you should write line(s) to copy the old state into the variable 'old_state' which is later passed to fn_reinforce()
-
+            old_state = (self.state, self.gameboard.cur_tile_type)
             # Drop the tile on the game board
             reward=self.gameboard.fn_drop()
             # TO BE COMPLETED BY STUDENT
             # Here you should write line(s) to add the current reward to the total reward for the current episode, so you can save it to disk later
-
+            self.reward_tots[self.episode] += reward
             # Read the new state
             self.fn_read_state()
             # Update the Q-table using the old state and the reward (the new state and the taken action should be stored as attributes in self)
-            self.fn_reinforce(old_state,reward)
+            self.fn_reinforce(old_state, reward)
 
 
 class TDQNAgent:
