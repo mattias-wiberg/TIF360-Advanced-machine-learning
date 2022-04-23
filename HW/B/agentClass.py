@@ -1,5 +1,4 @@
 import pickle
-from distutils.log import error
 import numpy as np
 import random
 
@@ -61,7 +60,7 @@ class TQAgent:
 
     def get_move(self, action_idx):
         if self.actions[self.gameboard.cur_tile_type]-1 < action_idx:
-            error("Action index out of range!")
+            raise Exception("Action index out of range!")
         tile_type = self.gameboard.cur_tile_type
         if tile_type == 0:
             if action_idx < 4:
@@ -89,14 +88,14 @@ class TQAgent:
     def fn_select_action(self):
         if np.random.rand()<self.epsilon:
             # Select random action
-            self.action_i=random.randint(0,self.actions[self.gameboard.cur_tile_type]-1)
+            self.action_i = np.random.randint(self.actions[self.gameboard.cur_tile_type])
         else:
             # Select action with highest Q-value
             self.action_i=np.argmax(self.qtables[self.gameboard.cur_tile_type][self.state])
 
         action = self.get_move(self.action_i)
         if self.gameboard.fn_move(action["x"], action["orientation"]):
-            error("Movement failed!")
+            raise Exception("Movement failed!")
         # TO BE COMPLETED BY STUDENT
         # This function should be written by you
         # Instructions:
