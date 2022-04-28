@@ -1,6 +1,10 @@
+import copy
 import pickle
 import numpy as np
 import random
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 
 # This file provides the skeleton structure for the classes TQAgent and TDQNAgent to be completed by you, the student.
 # Locations starting with # TO BE COMPLETED BY STUDENT indicates missing code that should be written by you.
@@ -162,8 +166,28 @@ class TQAgent:
             # Update the Q-table using the old state and the reward (the new state and the taken action should be stored as attributes in self)
             self.fn_reinforce(old_state, reward)
 
+class QN(nn.Module):
+    def __init__(self, in_dim, out_dim):
+        super(QN, self).__init__()
+
+        self.fc1 = nn.Linear(in_dim, in_dim, dtype=torch.float64)
+        self.fc2 = nn.Linear(in_dim, in_dim, dtype=torch.float64)
+        self.fc3 = nn.Linear(in_dim, in_dim, dtype=torch.float64)
+        self.fc4 = nn.Linear(in_dim, out_dim, dtype=torch.float64)
+    
+    def forward(self, x):
+        x = self.fc1(x)
+        x = F.tanh(x)
+        x = self.fc2(x)
+        x = F.tanh(x)
+        x = self.fc3(x)
+        x = F.tanh(x)
+        x = self.fc4(x)
+        return x
 
 class TDQNAgent:
+
+
     # Agent for learning to play tetris using Q-learning
     def __init__(self,alpha,epsilon,epsilon_scale,replay_buffer_size,batch_size,sync_target_episode_count,episode_count):
         # Initialize training parameters
@@ -175,9 +199,16 @@ class TDQNAgent:
         self.sync_target_episode_count=sync_target_episode_count
         self.episode=0
         self.episode_count=episode_count
+        self.reward_tots=[0]*episode_count
 
     def fn_init(self,gameboard):
         self.gameboard=gameboard
+        self.actions = [7, 6, 12, 3] # pillar, slash, L, square
+        self.qn = QN(gameboard.N_col*gameboard.N_row+len(self.actions), 4*4)
+        self.qnhat = copy.deepcopy(self.qn)
+        self.exp_buffer = []
+        self.criterion = nn.MSELoss()
+        self.optimizer = torch.optim.Adam(self.qn.parameters(), lr=self.alpha)
         # TO BE COMPLETED BY STUDENT
         # This function should be written by you
         # Instructions:
@@ -194,12 +225,17 @@ class TDQNAgent:
         # 'self.replay_buffer_size' the number of quadruplets stored in the experience replay buffer
 
     def fn_load_strategy(self,strategy_file):
+        # Load strategy from file
+        self.qn.load_state_dict(torch.load(strategy_file))
         pass
         # TO BE COMPLETED BY STUDENT
         # Here you can load the Q-network (to Q-network of self) from the strategy_file
 
     def fn_read_state(self):
-        pass
+        self.state = self.gameboard.board.flatten()
+        tile_type = -np.ones(len(self.gameboard.tiles))
+        tile_type[self.gameboard.cur_tile_type] = 1
+        self.state = np.append(self.state, tile_type) # concatenate the state with the tile type
         # TO BE COMPLETED BY STUDENT
         # This function should be written by you
         # Instructions:
@@ -213,8 +249,22 @@ class TDQNAgent:
         # 'self.gameboard.board[index_row,index_col]' table indicating if row 'index_row' and column 'index_col' is occupied (+1) or free (-1)
         # 'self.gameboard.cur_tile_type' identifier of the current tile that should be placed on the game board (integer between 0 and len(self.gameboard.tiles))
 
+    def get_valid_action(self, sorted_out):
+        for idx in sorted_out:
+            rotation = int(idx / 4)
+            position = idx % 4
+            if not self.gameboard.fn_move(position, rotation): # If the move is possible, break
+                return idx   
+
     def fn_select_action(self):
-        pass
+        self.qn.eval()
+        out = self.qn(torch.tensor(self.state)).detach().numpy()
+        sorted_out = np.argsort(out)[::-1] # descending order in terms of Q-values
+        if np.random.rand() < self.epsilon:
+            np.random.shuffle(sorted_out)
+        
+        self.action = self.get_valid_action(sorted_out)
+
         # TO BE COMPLETED BY STUDENT
         # This function should be written by you
         # Instructions:
@@ -233,7 +283,28 @@ class TDQNAgent:
         # You can use this function to map out which actions are valid or not
 
     def fn_reinforce(self,batch):
-        pass
+
+        for transition in batch:
+            state = transition[0]
+            action = transition[1]
+            reward = transition[2]
+            next_state = transition[3]
+            terminal = transition[4]
+
+            self.qnhat.eval()
+            y = reward
+            if not terminal:
+                out = self.qnhat(torch.tensor(next_state)).detach().numpy()
+                sorted_out = np.argsort(out)[::-1] # descending order in terms of Q-values
+                action = self.get_valid_action(sorted_out)
+                y += out[action]
+
+            self.qn.train()
+            self.optimizer.zero_grad()
+            out = self.qn(torch.tensor(state))
+            loss = self.criterion(out[action], torch.tensor(y, dtype=torch.float64))
+            loss.backward()
+            self.optimizer.step()
         # TO BE COMPLETED BY STUDENT
         # This function should be written by you
         # Instructions:
@@ -249,13 +320,15 @@ class TDQNAgent:
         if self.gameboard.gameover:
             self.episode+=1
             if self.episode%100==0:
-                print('episode '+str(self.episode)+'/'+str(self.episode_count)+' (reward: ',str(np.sum(self.reward_tots[range(self.episode-100,self.episode)])),')')
+                print('episode '+str(self.episode)+'/'+str(self.episode_count)+' (reward: ',str(np.mean(self.reward_tots[self.episode-100:self.episode])),')')
             if self.episode%1000==0:
                 saveEpisodes=[1000,2000,5000,10000,20000,50000,100000,200000,500000,1000000];
                 if self.episode in saveEpisodes:
-                    pass
                     # TO BE COMPLETED BY STUDENT
                     # Here you can save the rewards and the Q-network to data files
+                    torch.save(self.qn.state_dict(), 'qn_'+str(self.episode)+'.pth')
+                    torch.save(self.qnhat.state_dict(), 'qnhat_'+str(self.episode)+'.pth')
+                    pickle.dump(self.reward_tots, open('reward_tots_'+str(self.episode)+'.p', 'wb'))
             if self.episode>=self.episode_count:
                 raise SystemExit(0)
             else:
@@ -263,29 +336,35 @@ class TDQNAgent:
                     pass
                     # TO BE COMPLETED BY STUDENT
                     # Here you should write line(s) to copy the current network to the target network
+                    self.qnhat = copy.deepcopy(self.qn)
                 self.gameboard.fn_restart()
         else:
             # Select and execute action (move the tile to the desired column and orientation)
             self.fn_select_action()
             # TO BE COMPLETED BY STUDENT
             # Here you should write line(s) to copy the old state into the variable 'old_state' which is later stored in the ecperience replay buffer
+            old_state = self.state.copy()
 
             # Drop the tile on the game board
             reward=self.gameboard.fn_drop()
 
             # TO BE COMPLETED BY STUDENT
             # Here you should write line(s) to add the current reward to the total reward for the current episode, so you can save it to disk later
+            self.reward_tots[self.episode] += reward
 
             # Read the new state
             self.fn_read_state()
-
+            
             # TO BE COMPLETED BY STUDENT
             # Here you should write line(s) to store the state in the experience replay buffer
+            self.exp_buffer.append((old_state, self.action, reward, self.state.copy(), self.gameboard.gameover)) # Transition = {s_t, a_t, r_t, s_t+1}
 
             if len(self.exp_buffer) >= self.replay_buffer_size:
                 # TO BE COMPLETED BY STUDENT
                 # Here you should write line(s) to create a variable 'batch' containing 'self.batch_size' quadruplets 
+                batch = random.sample(self.exp_buffer, k=self.batch_size)
                 self.fn_reinforce(batch)
+                self.exp_buffer.pop(0) # Remove the oldest transition from the buffer
 
 
 class THumanAgent:
