@@ -170,19 +170,20 @@ class QN(nn.Module):
     def __init__(self, in_dim, out_dim):
         super(QN, self).__init__()
 
-        self.fc1 = nn.Linear(in_dim, in_dim, dtype=torch.float64)
-        self.fc2 = nn.Linear(in_dim, in_dim, dtype=torch.float64)
-        self.fc3 = nn.Linear(in_dim, in_dim, dtype=torch.float64)
-        self.fc4 = nn.Linear(in_dim, out_dim, dtype=torch.float64)
+        self.fc1 = nn.Linear(in_dim, 64, dtype=torch.float64)
+        self.fc2 = nn.Linear(64, 64, dtype=torch.float64)
+        self.fc3 = nn.Linear(64, out_dim, dtype=torch.float64)
+        #self.fc4 = nn.Linear(64, out_dim, dtype=torch.float64)
     
     def forward(self, x):
         x = self.fc1(x)
-        x = F.tanh(x)
+        x = F.relu(x)
         x = self.fc2(x)
-        x = F.tanh(x)
+        x = F.relu(x)
         x = self.fc3(x)
-        x = F.tanh(x)
-        x = self.fc4(x)
+        x = F.relu(x)
+        #x = F.tanh(x)
+        #x = self.fc4(x)
         return x
 
 class TDQNAgent:
@@ -283,6 +284,9 @@ class TDQNAgent:
         # You can use this function to map out which actions are valid or not
 
     def fn_reinforce(self,batch):
+        targets = []
+        action_value = []
+        self.qn.train()
 
         for transition in batch:
             state = transition[0]
@@ -298,13 +302,16 @@ class TDQNAgent:
                 sorted_out = np.argsort(out)[::-1] # descending order in terms of Q-values
                 action = self.get_valid_action(sorted_out)
                 y += out[action]
-
-            self.qn.train()
-            self.optimizer.zero_grad()
+            targets.append(torch.tensor(y, dtype=torch.float64))
             out = self.qn(torch.tensor(state))
-            loss = self.criterion(out[action], torch.tensor(y, dtype=torch.float64))
-            loss.backward()
-            self.optimizer.step()
+            action_value.append(out[action])
+
+        targets = torch.stack(targets)
+        action_value = torch.stack(action_value)
+        loss = self.criterion(action_value, targets)
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
         # TO BE COMPLETED BY STUDENT
         # This function should be written by you
         # Instructions:
