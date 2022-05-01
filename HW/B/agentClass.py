@@ -169,19 +169,15 @@ class TQAgent:
 class QN(nn.Module):
     def __init__(self, in_dim, out_dim):
         super(QN, self).__init__()
-
         self.fc1 = nn.Linear(in_dim, 64, dtype=torch.float64)
         self.fc2 = nn.Linear(64, 64, dtype=torch.float64)
         self.fc3 = nn.Linear(64, out_dim, dtype=torch.float64)
         #self.fc4 = nn.Linear(64, out_dim, dtype=torch.float64)
     
     def forward(self, x):
-        x = self.fc1(x)
-        x = F.relu(x)
-        x = self.fc2(x)
-        x = F.relu(x)
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
         x = self.fc3(x)
-        x = F.relu(x)
         #x = F.tanh(x)
         #x = self.fc4(x)
         return x
@@ -260,12 +256,14 @@ class TDQNAgent:
     def fn_select_action(self):
         self.qn.eval()
         out = self.qn(torch.tensor(self.state)).detach().numpy()
-        sorted_out = np.argsort(out)[::-1] # descending order in terms of Q-values
-        if np.random.rand() < self.epsilon:
-            np.random.shuffle(sorted_out)
+        if np.random.rand() < max(self.epsilon, 1-self.episode/self.epsilon_scale): # epsilon-greedy
+            self.action = random.randint(0, (4*4)-1)
+        else: 
+            self.action = np.argmax(out)
         
-        self.action = self.get_valid_action(sorted_out)
-
+        rotation = int(self.action / 4)
+        position = self.action % 4
+        self.gameboard.fn_move(position, rotation)
         # TO BE COMPLETED BY STUDENT
         # This function should be written by you
         # Instructions:
@@ -287,6 +285,7 @@ class TDQNAgent:
         targets = []
         action_value = []
         self.qn.train()
+        self.qnhat.eval()
 
         for transition in batch:
             state = transition[0]
@@ -295,13 +294,10 @@ class TDQNAgent:
             next_state = transition[3]
             terminal = transition[4]
 
-            self.qnhat.eval()
             y = reward
             if not terminal:
                 out = self.qnhat(torch.tensor(next_state)).detach().numpy()
-                sorted_out = np.argsort(out)[::-1] # descending order in terms of Q-values
-                action = self.get_valid_action(sorted_out)
-                y += out[action]
+                y += max(out)
             targets.append(torch.tensor(y, dtype=torch.float64))
             out = self.qn(torch.tensor(state))
             action_value.append(out[action])
@@ -371,7 +367,8 @@ class TDQNAgent:
                 # Here you should write line(s) to create a variable 'batch' containing 'self.batch_size' quadruplets 
                 batch = random.sample(self.exp_buffer, k=self.batch_size)
                 self.fn_reinforce(batch)
-                self.exp_buffer.pop(0) # Remove the oldest transition from the buffer
+                if len(self.exp_buffer) >= self.replay_buffer_size + 2:
+                    self.exp_buffer.pop(0) # Remove the oldest transition from the buffer
 
 
 class THumanAgent:
