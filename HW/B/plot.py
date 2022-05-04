@@ -8,7 +8,7 @@ def moving_average(x, w):
         avg.append(np.mean(x[max(0, int(i-w/2)):min(len(x)-1,int(i+w/2))]))
     return avg
 
-task = (1,"a")
+task = (2,"a")
 rewards = pickle.load(open("tasks/"+str(task[0])+"/"+task[1]+"/rewards.p", "rb"))
 plt.plot(rewards)
 average = moving_average(rewards, 100)

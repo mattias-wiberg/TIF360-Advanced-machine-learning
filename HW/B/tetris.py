@@ -17,16 +17,16 @@ human_player=0
 
 # Choose parameter sets for different tasks
 #param_set=PARAM_TASK1a
-param_set=PARAM_TASK1b
+#param_set=PARAM_TASK1b
 #param_set=PARAM_TASK1c
 #param_set=PARAM_TASK1d
-#param_set=PARAM_TASK2a
+param_set=PARAM_TASK2a
 #param_set=PARAM_TASK2b
 
 # Use files to evaluate strategy
 # If you change 'strategy_file' to the location of a file containing a stored Q-table or Q-network, you can evaluate the success of the found strategy
 if param_set==PARAM_TASK1a:
-    strategy_file=''
+    strategy_file='HW/B/tasks/1/c/strategy.p'
 elif param_set==PARAM_TASK1b:
     strategy_file=''
 elif param_set==PARAM_TASK1c:
