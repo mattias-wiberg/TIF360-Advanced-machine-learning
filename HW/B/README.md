@@ -1,1 +1,6 @@
 1.a)
+![plot](./tasks/1/a/rewards.png)
+1.b)
+![plot](./tasks/1/b/rewards.png)
+1.c)
+![plot](./tasks/1/c/rewards.png)

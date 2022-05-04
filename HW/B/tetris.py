@@ -17,10 +17,10 @@ human_player=0
 
 # Choose parameter sets for different tasks
 #param_set=PARAM_TASK1a
-#param_set=PARAM_TASK1b
+param_set=PARAM_TASK1b
 #param_set=PARAM_TASK1c
 #param_set=PARAM_TASK1d
-param_set=PARAM_TASK2a
+#param_set=PARAM_TASK2a
 #param_set=PARAM_TASK2b
 
 # Use files to evaluate strategy
