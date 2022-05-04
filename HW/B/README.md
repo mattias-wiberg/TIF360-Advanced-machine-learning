@@ -15,7 +15,7 @@ When testing the strategy from C after training for 20k episodes on the determin
 ![plot](./tasks/1/c/game.png)
 <br>
 **1.d)** <br>
-It is possible to do but would require a lot of memery since the state space grows a lot and exploration of the state space would take a lot of time since of the sheer size of it. This is where a better approach would be a deep q-network.
+It is not possible to do since it would require in best case 2^19 bits of memory since the state space grows a lot and exploration of the state space would take a lot of time since of the sheer size of it. This is where a better approach would be a deep q-network.
 <br>
 **2.a)** <br>
 Compared to the q learning in 1.c we can see that the moving average is much less noisy which indicates that even at a new state the network manage to aproximate the best action. With this approach after just training for 10k episodes the agent manage to average a score of around 45 on average. 
