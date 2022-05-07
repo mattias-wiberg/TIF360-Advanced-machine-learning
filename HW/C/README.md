@@ -39,3 +39,5 @@ Using a LSTM and different latent features in the bottle neck layer.
 ![plot](lstm_output.png)<br>
 256:<br>
 ![plot](lstm_output_256.png)<br>
+256 deep:<br>
+![plot](lstm_output_256_deep.png)<br>
